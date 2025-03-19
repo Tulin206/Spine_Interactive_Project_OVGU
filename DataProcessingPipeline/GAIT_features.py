@@ -36,6 +36,7 @@ class GAIT_features:
         # mag_gyr = self.fe.mag_gyr[HS[0]:MSw[-1]]
         gyr = self.fe.gyr[:, HS[0]:MSw[-1]]
         duration = (MSw[-1] - HS[0]) / self.fe.fs
+        # duration = 120
         gait_features.append(duration)
         gait_feature_list.append(str(test_name) + "_duration")
 
@@ -72,8 +73,6 @@ class GAIT_features:
         print("Total Distance Walked:", total_distance)
         print("Gait Speed:", gait_speed)
 
-        avg_vel = gait_speed
-
         gait_features.append(total_distance)
         gait_feature_list.append(str(test_name) + "_total_distance")
 
@@ -81,15 +80,8 @@ class GAIT_features:
         gait_features.append(gait_speed)
         gait_feature_list.append(str(test_name) + "_gait_speed")
 
-        # Apply Kalman filter to accel_mag and gyro_mag
-        #smoothed_accel_mag = self.fe.moving_average(self.fe.mag_acc)
-        #smoothed_gyro_mag = self.fe.moving_average(self.fe.mag_gyr)
-
-        #print("Filtered Accel Magnitude:", smoothed_accel_mag[:10])  # First 10 values for inspection
-        #print("Filtered Gyro Magnitude:", smoothed_gyro_mag[:10])  # First 10 values for inspection
-
-        print("Accel Magnitude:", self.fe.mag_acc[:30])  # First 10 values for inspection
-        print("Gyro Magnitude:", self.fe.mag_gyr[:30])  # First 10 values for inspection
+        #print("Accel Magnitude:", self.fe.mag_acc[:30])  # First 10 values for inspection
+        #print("Gyro Magnitude:", self.fe.mag_gyr[:30])  # First 10 values for inspection
 
         # Select a window for zooming in (e.g., 2 to 4 seconds)
         start_time = 50  # in seconds
@@ -150,103 +142,19 @@ class GAIT_features:
         # acc_global = self._transform_acc(acc, orientations)
         # acc_corrected = self._remove_gravity(acc.T)
 
-        velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
-        velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
-        velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
-        mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
+        # Compute Velocity
+        # velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
+        # velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
+        # velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
+        # mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
+        velocity_x = cumtrapz(self.fe.acc[0, :], initial=0)  # Integrate accelerometer data to get velocity
+        velocity_y = cumtrapz(self.fe.acc[1, :], initial=0)
+        velocity_z = cumtrapz(self.fe.acc[2, :], initial=0)
+        mag_vel = np.sqrt(velocity_x**2 + velocity_y**2 + velocity_z**2) + 1e-6
         #avg_vel = np.mean(mag_vel) * 10
-        #gait_features.append(avg_vel)
-        #gait_feature_list.append(str(test_name) + "_avg_vel")
-
-
-        """t = np.arange(0, len(acc[0,:]), 1)
-        velocity_x = np.power(self._get_velocity(self.acc[0, :]), 2)
-        velocity_y = np.power(self._get_velocity(self.acc[1, :]), 2)
-        velocity_z = np.power(self._get_velocity(self.acc[2, :]), 2)"""
-        """
-        orientations = self.fe.get_orientation(gyr)
-        acc_global = self.fe.transform_acc(acc, orientations)
-        acc_corrected = self.fe.remove_gravity(acc_global)
-        velocity = self.fe.compute_velocity(acc_corrected)
-        avg_velocity = self.fe.get_avg_vel(velocity)
-        gait_features.append(avg_velocity)
-        gait_feature_list.append(str(test_name) + "_avg_velocity")  ## Gait_Speed
-
-        print("Raw Acceleration:", acc[:5])
-        print("Gravity Removed Acceleration:", acc_corrected[:5])
-        print("Velocity:", velocity[:5])
-        print("Average Velocity:", avg_velocity)
-        print("Final Velocity:", velocity[-5:])  # Check for drift
-        print("Mean Velocity:", np.mean(velocity, axis=0))  # Check expected range
-        
-        
-         # Step 1: Apply Kalman filter to get velocity components
-        velocity_x = self.fe.apply_Kalman_Filter(self.fe.acc[0, :])
-        velocity_y = self.fe.apply_Kalman_Filter(self.fe.acc[1, :])
-        velocity_z = self.fe.apply_Kalman_Filter(self.fe.acc[2, :])
-
-        # Step 2: Calculate the magnitude of velocity
-        mag_vel = np.sqrt(velocity_x ** 2 + velocity_y ** 2 + velocity_z ** 2)
-
-        # Step 3: Integrate velocity to find total displacement
-        dt = 1.0 / self.fe.fs  # Time step
-
-        # Calculate total displacement using np.trapz
-        try:
-            total_displacement = np.trapz(mag_vel, dx=dt)
-        except AttributeError:
-            # If np.trapz is not available, use manual integration
-            total_displacement = 0
-            for i in range(1, len(mag_vel)):
-                total_displacement += 0.5 * (mag_vel[i] + mag_vel[i - 1]) * dt
-
-        # Step 4: Calculate total time (assuming consistent time step)
-        total_time = len(mag_vel) * dt
-
-        # Step 5: Calculate average velocity
-        avg_vel = total_displacement / total_time
-
-        # Store the result
+        avg_vel = gait_speed
         gait_features.append(avg_vel)
         gait_feature_list.append(str(test_name) + "_avg_vel")
-    
-        # Step 1: Compute orientation using gyroscope data
-        orientations = self.fe.get_orientation(self.fe.gyr)  # Get orientations from gyro data
-
-        # Step 2: Transform accelerometer data from local to global coordinates
-        acc_global = self.fe.transform_acc(self.fe.acc, orientations)
-
-        # Step 3: Remove gravity from global acceleration
-        acc_data_no_gravity = self.fe.remove_gravity(acc_global)
-
-        velocity = self.fe.compute_velocity(acc_data_no_gravity)
-        avg_vel, _ = self.fe.get_avg_vel(velocity)
-        gait_features.append(avg_vel)
-        gait_feature_list.append(str(test_name) + "_avg_vel")
-    """
-        # Step 1: Remove gravity
-        #acc_data_no_gravity_x = self.fe.remove_gravity(acc[0, :])
-        #acc_data_no_gravity_y = self.fe.remove_gravity(acc[1, :])
-        #acc_data_no_gravity_z = self.fe.remove_gravity(acc[2, :])
-
-        # Step 2: Apply Kalman filter to estimate velocity (for each axis)
-        #velocity_x = self.fe.apply_Kalman_Filter(acc_data_no_gravity[0, :])  # Apply Kalman filter to x-axis
-        #velocity_y = self.fe.apply_Kalman_Filter(acc_data_no_gravity[1, :])  # Apply Kalman filter to y-axis
-        #velocity_z = self.fe.apply_Kalman_Filter(acc_data_no_gravity[2, :])  # Apply Kalman filter to z-axis
-
-        # Step 3: Compute the magnitude of the velocity
-        #mag_vel = np.sqrt(np.power(velocity_x, 2) + np.power(velocity_y, 2) + np.power(velocity_z, 2))
-
-        #velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
-        #velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
-        #velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
-        #mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
-
-        # Step 4: Compute the average velocity
-        #avg_vel = np.mean(mag_vel) * 10
-        #avg_vel = np.mean(mag_vel)        # ISRAT
-        #gait_features.append(avg_vel)
-        #gait_feature_list.append(str(test_name) + "_avg_vel")  ## Gait_Speed
 
         # Plot velocity magnitude
         plt.plot(mag_vel)
@@ -255,80 +163,88 @@ class GAIT_features:
         plt.ylabel('Velocity (m/s)')
         plt.show()
 
-        """plt.plot(velocity_x)
-        plt.plot(velocity_y)
-        plt.plot(velocity_z)
-        plt.show()"""
+        # Check ranges of mag_acc and mag_vel
+        print(f"mag_acc min: {np.min(mag_acc)}, max: {np.max(mag_acc)}")
+        print(f"mag_vel min: {np.min(mag_vel)}, max: {np.max(mag_vel)}")
 
-        """#plt.plot(self.acc[2, 0:2000])
-        plt.plot(self.acc[2, 0:1500])
-        plt.plot(mag_vel[0:1500])
+        # Plot mag_vel to see if it makes sense
+        plt.plot(mag_vel, label="Magnitude of Velocity")
+        plt.xlabel('Time (samples)')
+        plt.ylabel('Velocity (m/s)')
+        plt.title('Magnitude of Velocity Over Time')
+        plt.legend()
         plt.show()
-        plt.plot(self._get_velocity(self.acc[0, :])[0:5000])
-        plt.plot(self._get_velocity(self.acc[1, :])[0:5000])
-        plt.plot(self._get_velocity(self.acc[2, :])[0:5000])
-        plt.plot(self.acc[2, :])
-        plt.show()"""
 
-        # Fatigue index calculation     #### ISRAT
-        fatigue_index = 0.0
-        if num_gc >= 2:
-            velocities_per_cycle = []
-            for i in range(num_gc):
-                start = HS[i] - HS[0]
-                end = MSw[i] - HS[0]
-                start = max(0, start)
-                end = min(len(mag_vel), end)
-                if start < end:
-                    cycle_vel = mag_vel[start:end]
-                    # velocities_per_cycle.append(np.mean(cycle_vel) * 10)
-                    velocities_per_cycle.append(np.mean(cycle_vel))
 
-            # Print velocities per cycle
-            print("Velocities per cycle:", velocities_per_cycle)
+        # Compute Power
+        mag_acc = (self.fe.mag_acc - np.min(self.fe.mag_acc)) / (np.max(self.fe.mag_acc) - np.min(self.fe.mag_acc))
+        mag_vel = (mag_vel - np.min(mag_vel)) / (np.max(mag_vel) - np.min(mag_vel))
 
-            if len(velocities_per_cycle) >= 2:
-                x = np.arange(len(velocities_per_cycle))
-                slope, _ = np.polyfit(x, velocities_per_cycle, 1)
-                fatigue_index = slope
+        # Add a small constant to avoid multiplication by zero
+        epsilon = 1e-6  # Small value to avoid multiplication by zero
+        mag_vel = np.maximum(mag_vel, epsilon)  # Ensure no value is too close to zero
+
+        print(f"mag_acc std: {np.std(mag_acc)}")
+        print(f"mag_vel std: {np.std(mag_vel)}")
+
+        #power = np.abs(mag_acc * mag_vel)
+        power = (mag_acc * mag_vel) / 1e3  # Scaling down if necessary
+        print("Power Values:", power[:10])  # Print the first 10 values of power for inspection
+        # # Normalize power to range [0, 1] for better variation handling
+        # power = (power - np.min(power)) / (np.max(power) - np.min(power))
+
+        def moving_average(data, window_size=5):
+            return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+
+        # Apply moving average to mag_vel
+        smoothed_mag_vel = moving_average(mag_vel)
+
+        # Now recalculate power with the smoothed mag_vel
+        power = (mag_acc[:len(smoothed_mag_vel)] * smoothed_mag_vel) / 1e3
+
+        # Check power to see its fluctuation
+        plt.plot(power, label='Power')
+        plt.axhline(y=np.max(power), color='r', linestyle='--', label='Peak Power')
+        plt.axhline(y=np.min(power), color='b', linestyle='--', label='Min Power')
+        plt.xlabel('Time (samples)')
+        plt.ylabel('Power')
+        plt.title('Power Over Time')
+        plt.legend()
+        plt.show()
+        #min_length = min(len(mag_acc), len(mag_vel))
+        #power = mag_acc[:min_length] * mag_vel[:min_length]
+        peak_power = np.max(power)
+        mean_power = np.mean(power)
+        mean_power = max(mean_power, 1e-6)  # Prevent extremely small values
+        std_power = np.std(power)
+        cv = (std_power / mean_power) * 100  # Coefficient of variation in percentage
+        fatigue_index = cv
+        # # Example alternate fatigue index calculation
+        # if menn_power > 0:  # Ensure we don't divide by zero
+        #     fatigue_index = (peak_power - menn_power) / peak_power * 100
+        # else:
+        #     fatigue_index = 0  # Handle the case where min_power is zero
+        # fatigue_index = ((peak_power - menn_power) / peak_power) * 100
+        print(f"Peak Power: {peak_power}, Min Power: {mean_power}")
+        # fatigue_index = ((peak_power - min_power) / peak_power) * 100 if peak_power != 0 else 0
+
+        print(f"mag_acc min: {np.min(mag_acc)}, max: {np.max(mag_acc)}")
+        print(f"mag_vel min: {np.min(mag_vel)}, max: {np.max(mag_vel)}")
+        print(f"Power min: {np.min(power)}, max: {np.max(power)}")
 
         gait_features.append(fatigue_index)
-        gait_feature_list.append(f"{test_name}_fatigue_index")
+        gait_feature_list.append(str(test_name) + "_fatigue_index")
 
-        # Additional fatigue feature: percent change in cycle velocity    ### ISRAT
-        fatigue_percent_change = 0.0
-        if velocities_per_cycle:
-            first_cycle = velocities_per_cycle[0]
-            last_cycle = velocities_per_cycle[-1]
-            print(f"First cycle velocity: {first_cycle}")
-            print(f"Last cycle velocity: {last_cycle}")
-
-            if first_cycle != 0:
-                fatigue_percent_change = ((last_cycle - first_cycle) / first_cycle) * 100
-                print(f"Computed Fatigue Percent Change: {fatigue_percent_change}%")
-
-        # Append the fatigue percent change feature
-        gait_features.append(fatigue_percent_change)
-        gait_feature_list.append(f"{test_name}_fatigue_percent_change")
-
-        # Check for outliers in velocity data
-        if len(velocities_per_cycle) > 0:
-            q1 = np.percentile(velocities_per_cycle, 25)
-            q3 = np.percentile(velocities_per_cycle, 75)
-            iqr = q3 - q1
-            lower_bound = q1 - 1.5 * iqr
-            upper_bound = q3 + 1.5 * iqr
-
-            outliers = [v for v in velocities_per_cycle if v < lower_bound or v > upper_bound]
-            print("Outliers in velocity data:", outliers)
-
-        # Plot velocity trend
-        if velocities_per_cycle:
-            plt.plot(range(len(velocities_per_cycle)), velocities_per_cycle, marker='o', linestyle='-')
-            plt.xlabel("Gait Cycle Number")
-            plt.ylabel("Mean Velocity per Cycle (m/s)")
-            plt.title("Velocity Change Over Gait Cycles")
-            plt.show()
+        plt.figure(figsize=(10, 5))
+        plt.plot(power, label='Power', color='g')
+        plt.axhline(y=peak_power, color='r', linestyle='--', label='Peak Power')
+        plt.axhline(y=mean_power, color='b', linestyle='--', label='Mean Power')
+        plt.xlabel('Time (samples)')
+        plt.ylabel('Power')
+        plt.title('Power Over Time')
+        plt.legend()
+        plt.grid()
+        plt.show()
 
         # Gait variability metrics     ### ISRAT
         def add_variability_metrics(values, metric_name):
@@ -355,9 +271,10 @@ class GAIT_features:
         add_variability_metrics(stride_lengths, "stride_length")
 
         # distance
-        distance = duration * avg_vel
-        gait_features.append(distance)
-        gait_feature_list.append(str(test_name) + "_distance")
+        #distance = duration * avg_vel
+        distance = total_distance
+        #gait_features.append(distance)
+        #gait_feature_list.append(str(test_name) + "_distance")
 
         # average step length - step len = TSt - HS
         avg_step_len = np.mean(((TSt[0:num_gc] - HS[0:num_gc]) / self.fe.fs) * avg_vel)
@@ -425,42 +342,6 @@ class GAIT_features:
         gait_features.append(ds_per)
         gait_feature_list.append(str(test_name) + "_ds_per")
 
-        """
-        # **Gait Speed Calculation**     ISRAT
-        total_time = duration
-        #total_distance = n_steps * np.mean(step_lengths)  # Total distance walked    # Ensure step_lengths is a single value
-        #gait_speed = total_distance / total_time  # Speed in meters per second (m/s)
-        gait_speed = distance / total_time  # Speed in meters per second (m/s)
-
-        gait_features.append(gait_speed)
-        gait_feature_list.append(str(test_name) + "_gait_speed")
-        """
-        """
-        walking_distance = 6
-        turning_distance = 1
-        # Distance covered per 2 steps (gait cycle)
-        distance_per_step = (walking_distance + turning_distance)/2  # in meters = 3.5
-
-        # Total distance covered (in meters)
-        #total_dist = n_steps * distance_per_step
-
-        # Total distance covered (in meters)
-        total_dist = n_steps * step_lengths
-
-        # Time duration of the walk (in seconds)
-        time_duration = 2 * 60  # 2 minutes in seconds
-
-        # Gait speed (in meters per second)
-        gait_speed_test = total_dist / time_duration
-
-        # Append the gait speed to the features list
-        gait_features.append(gait_speed_test)
-        gait_feature_list.append(str(test_name) + "_gait_speed_test")
-        """
-
-        #gait_features.append(total_distance)
-        #gait_feature_list.append(str(test_name) + "_total_distance")
-
         # ========== Symmetry Index Calculations ==========
         # Step Length Symmetry        #### ISRAT
         step_lens = ((TSt[0:num_gc] - HS[0:num_gc]) / self.fe.fs) * avg_vel
@@ -525,49 +406,49 @@ class GAIT_features:
             f"{test_name}_angular_vel_z_symmetry"
         ])
 
-        # Kalman-filtered velocity computation    ## ISRAT
-        velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
-        velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
-        velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
-        mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
-
-        # DEBUG: Compare with manual integration     ## ISRAT
-        dt = 1 / self.fe.fs  # time interval per sample
-        v_x = np.cumsum(self.fe.acc[0, :] * dt)
-        v_y = np.cumsum(self.fe.acc[1, :] * dt)
-        v_z = np.cumsum(self.fe.acc[2, :] * dt)
-        mag_vel_manual = np.sqrt(v_x ** 2 + v_y ** 2 + v_z ** 2)
-        print("Manual average velocity (m/s):", np.mean(mag_vel_manual))
-        print("Kalman filter average velocity (m/s):", np.mean(mag_vel))
-
-        time = np.arange(len(mag_vel_manual)) * dt  # Time axis based on sampling rate   ## ISRAT
-        plt.plot(time, mag_vel_manual, label="Manually Integrated Velocity")
-        plt.plot(time, mag_vel, label="Kalman Filtered Velocity", linestyle="dashed")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Velocity (m/s)")
-        plt.legend()
-        plt.title("Velocity over Time")
-        plt.show()
-
-        fs = 100  # Sampling frequency
-        acc = np.random.randn(3, 1000)
-        gyr = np.random.randn(3, 1000)
-        events = np.zeros(1000)
-        unproc_acc = np.random.randn(3, 1000)
-        fe = FeatureExtraction(acc, gyr, events, fs, unproc_acc)
-
-        deviation = fe.get_deviation(acc[0])
-        assert deviation >= 0, "Deviation should be non-negative"
-
-        velocity = fe.compute_velocity(acc)
-        assert velocity.shape == acc.shape, "Velocity shape mismatch"
-
-        avg_vel, vel_mag = fe.get_avg_vel(velocity)
-        assert avg_vel >= 0, "Average velocity should be non-negative"
-
-        steps = fe.count_steps(acc[0])
-        assert isinstance(steps, int) and steps >= 0, "Step count should be a non-negative integer"
-
-        print("All tests passed!")
+        # # Kalman-filtered velocity computation    ## ISRAT
+        # velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
+        # velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
+        # velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
+        # mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
+        #
+        # # DEBUG: Compare with manual integration     ## ISRAT
+        # dt = 1 / self.fe.fs  # time interval per sample
+        # v_x = np.cumsum(self.fe.acc[0, :] * dt)
+        # v_y = np.cumsum(self.fe.acc[1, :] * dt)
+        # v_z = np.cumsum(self.fe.acc[2, :] * dt)
+        # mag_vel_manual = np.sqrt(v_x ** 2 + v_y ** 2 + v_z ** 2)
+        # print("Manual average velocity (m/s):", np.mean(mag_vel_manual))
+        # print("Kalman filter average velocity (m/s):", np.mean(mag_vel))
+        #
+        # time = np.arange(len(mag_vel_manual)) * dt  # Time axis based on sampling rate   ## ISRAT
+        # plt.plot(time, mag_vel_manual, label="Manually Integrated Velocity")
+        # plt.plot(time, mag_vel, label="Kalman Filtered Velocity", linestyle="dashed")
+        # plt.xlabel("Time (s)")
+        # plt.ylabel("Velocity (m/s)")
+        # plt.legend()
+        # plt.title("Velocity over Time")
+        # plt.show()
+        #
+        # fs = 100  # Sampling frequency
+        # acc = np.random.randn(3, 1000)
+        # gyr = np.random.randn(3, 1000)
+        # events = np.zeros(1000)
+        # unproc_acc = np.random.randn(3, 1000)
+        # fe = FeatureExtraction(acc, gyr, events, fs, unproc_acc)
+        #
+        # deviation = fe.get_deviation(acc[0])
+        # assert deviation >= 0, "Deviation should be non-negative"
+        #
+        # velocity = fe.compute_velocity(acc)
+        # assert velocity.shape == acc.shape, "Velocity shape mismatch"
+        #
+        # avg_vel, vel_mag = fe.get_avg_vel(velocity)
+        # assert avg_vel >= 0, "Average velocity should be non-negative"
+        #
+        # steps = fe.count_steps(acc[0])
+        # assert isinstance(steps, int) and steps >= 0, "Step count should be a non-negative integer"
+        #
+        # print("All tests passed!")
 
         return gait_features, gait_feature_list

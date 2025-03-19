@@ -91,52 +91,6 @@ class FeatureExtraction:
 
         return total_distance
 
-    """
-    # Function to detect turns and straight walking based on threshold
-    def detect_turns(self, accel_mag, gyro_mag, accel_thresh = 0.2, gyro_thresh = 0.65):
-        # Create lists to store times for walking and turning
-        walking_times = []
-        turning_times = []
-
-        is_turning = False
-        turn_start = 0
-        walk_start = 0
-
-        for i in range(len(accel_mag)):
-            if accel_mag[i] < accel_thresh and gyro_mag[i] > gyro_thresh:  # Turn detected
-                if not is_turning:     ## If is_turning == False
-                    is_turning = True
-                    turn_start = i
-                if i == len(accel_mag) - 1:  # End of data
-                    turning_times.append(i - turn_start)
-            else:  # Walking detected
-                if is_turning:
-                    is_turning = False
-                    turning_times.append(i - turn_start)
-                if walk_start == 0 or i - walk_start > 1:  # Ensure walking phase is separated
-                    walk_start = i
-                    walking_times.append(i - walk_start)
-        print("Walking_Time: ", walking_times)
-        print("Turning_Time: ", turning_times)
-        return walking_times, turning_times
-
-    # Function to calculate total distance walked based on straight walking and turning times
-    def estimate_total_distance_v2(self, total_time, t_straight, t_turn):
-        # Calculate the duration of one full cycle (T_straight + T_turn)
-        cycle_duration = t_straight + t_turn
-
-        # Calculate the total number of full cycles completed during the total time
-        num_cycles = total_time / cycle_duration
-
-        # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
-        cycle_distance = 6 + 1.04 + 6 + 1.04  # 14.08 meters
-
-        # Calculate the total distance walked
-        total_distance = num_cycles * cycle_distance
-
-        return total_distance
-    """
-
     # Calculates how much x values deviate from the average
     def _get_deviation(self, x):
         avg_x = np.mean(x)
