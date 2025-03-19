@@ -60,7 +60,7 @@ class GAIT_features:
         walking_times, turning_times = self.fe.detect_turns(self.fe.mag_acc, self.fe.mag_gyr)
 
         t_straight = np.mean(walking_times)  # Average time spent walking straight
-        t_turn = np.median(turning_times)  # Average time spent turning
+        t_turn = np.mean(turning_times)  # Average time spent turning
 
         # Check for empty lists to prevent errors
         if walking_times and turning_times:

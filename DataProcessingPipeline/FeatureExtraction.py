@@ -36,7 +36,7 @@ class FeatureExtraction:
         self.unproc_acc = unproc_acc
         # self.cog = cog
 
-    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=0.2, gyro_thresh=0.7):
+    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=0.53, gyro_thresh=0.79):
         walking_times = []
         turning_times = []
 
@@ -84,10 +84,20 @@ class FeatureExtraction:
         num_cycles = total_time / cycle_duration
 
         # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
-        cycle_distance = 6 + 1.04 + 6 + 1.04  # 14.08 meters
+        cycle_distance = 10 + 1.04 + 10 + 1.04  # 14.08 meters
 
         # Calculate the total distance walked
         total_distance = num_cycles * cycle_distance
+
+        # Account for incomplete cycle if the last one is unfinished
+        remaining_time = total_time % cycle_duration
+        if remaining_time > 0:
+            # Check if the remaining time includes a turning phase or not
+            if remaining_time > t_straight:
+                # Add the remaining distance from the last incomplete cycle
+                total_distance += (remaining_time - t_straight) / t_turn * 1.04  # Proportional distance based on remaining turn time
+            else:
+                total_distance += (remaining_time / t_straight) * 10  # Add the remaining walking distance
 
         return total_distance
 
