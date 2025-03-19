@@ -2,7 +2,7 @@
 #import DataProcessingPipeline as dpp
 from DataProcessingPipeline.DataExtraction import DataExtraction
 from DataProcessingPipeline.GaitProcessing import GaitProcessing
-from DataProcessingPipeline.FeatureExtraction_old import FeatureExtraction
+from DataProcessingPipeline.FeatureExtraction import FeatureExtraction
 import pandas as pd
 from tabulate import tabulate
 import os, sys
@@ -17,8 +17,8 @@ if __name__ == '__main__':
     data_dir = {"enode": enode_data_dir, "phone": sp_data_dir}
 
     # get test and task info from app
-    #test = "gait"
-    # task = "2min"
+    test = "gait"
+    task = "2min"
 
     #test = "sts"
     #task = "5rep"
@@ -26,9 +26,6 @@ if __name__ == '__main__':
     #test = "tug"
     #task = "single"
     #task = "dual"
-
-    test = "gait"
-    task = "2min"
 
     completed = 0
     valid = 0

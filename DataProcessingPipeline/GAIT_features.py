@@ -1,6 +1,7 @@
 from DataProcessingPipeline.FeatureExtraction import FeatureExtraction
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.integrate import cumulative_trapezoid as cumtrapz
 """
 we don't need inherit FeatureExtraction class rather we can create an instance of FeatureExtraction class to access it's attributes (composition principle-> "has-a" relationship)
 class TUG_features(FeatureExtraction):
@@ -31,13 +32,111 @@ class GAIT_features:
         gait_feature_list.append(str(test_name) + "_num_gc")
         mag_acc = self.fe.mag_acc[HS[0]:MSw[-1]]
         acc = self.fe.acc[:, HS[0]:MSw[-1]]
+        print(np.shape(acc))
+        # mag_gyr = self.fe.mag_gyr[HS[0]:MSw[-1]]
         gyr = self.fe.gyr[:, HS[0]:MSw[-1]]
         duration = (MSw[-1] - HS[0]) / self.fe.fs
+        gait_features.append(duration)
+        gait_feature_list.append(str(test_name) + "_duration")
 
         # num steps
         n_steps = num_gc * 2
         gait_features.append(n_steps)
         gait_feature_list.append(str(test_name) + "_n_steps")
+
+        steps_peaks = self.fe.count_steps(mag_acc)  # Use magnitude signal
+
+        # Use agreement or weighted average
+        if abs(n_steps - steps_peaks) <= 2:
+            final_steps = (n_steps + steps_peaks) // 2
+        else:
+            final_steps = steps_peaks  # Fallback to peaks
+
+        gait_features.append(final_steps)
+        gait_feature_list.append(str(test_name) + "_final_steps")
+
+        # Calculate total distance and gait speed
+        walking_times, turning_times = self.fe.detect_turns(self.fe.mag_acc, self.fe.mag_gyr)
+
+        t_straight = np.mean(walking_times)  # Average time spent walking straight
+        t_turn = np.median(turning_times)  # Average time spent turning
+
+        # Check for empty lists to prevent errors
+        if walking_times and turning_times:
+            total_distance = self.fe.estimate_total_distance_v2(120, t_straight, t_turn)
+            gait_speed = total_distance / 120  # Speed = Distance / Time
+        else:
+            total_distance = 0
+            gait_speed = 0
+
+        print("Total Distance Walked:", total_distance)
+        print("Gait Speed:", gait_speed)
+
+        avg_vel = gait_speed
+
+        gait_features.append(total_distance)
+        gait_feature_list.append(str(test_name) + "_total_distance")
+
+        gait_speed = total_distance / 120  # Speed = Distance / Time
+        gait_features.append(gait_speed)
+        gait_feature_list.append(str(test_name) + "_gait_speed")
+
+        # Apply Kalman filter to accel_mag and gyro_mag
+        #smoothed_accel_mag = self.fe.moving_average(self.fe.mag_acc)
+        #smoothed_gyro_mag = self.fe.moving_average(self.fe.mag_gyr)
+
+        #print("Filtered Accel Magnitude:", smoothed_accel_mag[:10])  # First 10 values for inspection
+        #print("Filtered Gyro Magnitude:", smoothed_gyro_mag[:10])  # First 10 values for inspection
+
+        print("Accel Magnitude:", self.fe.mag_acc[:30])  # First 10 values for inspection
+        print("Gyro Magnitude:", self.fe.mag_gyr[:30])  # First 10 values for inspection
+
+        # Select a window for zooming in (e.g., 2 to 4 seconds)
+        start_time = 50  # in seconds
+        end_time = 110  # in seconds
+        start_idx = int(start_time * self.fe.fs)
+        end_idx = int(end_time * self.fe.fs)
+
+        # Plot only the selected time window
+        plt.figure(figsize=(12, 6))
+
+        # Accelerometer Magnitude Plot
+        plt.subplot(2, 1, 1)
+        plt.plot(np.linspace(start_time, end_time, end_idx - start_idx), self.fe.mag_acc[start_idx:end_idx], color='b')
+        plt.title(f'Magnitude of Accelerometer (Zoomed In: {start_time}-{end_time} sec)')
+        plt.xlabel('Time (seconds)')
+        plt.ylabel('Magnitude')
+        plt.grid()
+
+        # Gyroscope Magnitude Plot
+        plt.subplot(2, 1, 2)
+        plt.plot(np.linspace(start_time, end_time, end_idx - start_idx), self.fe.mag_gyr[start_idx:end_idx], color='r')
+        plt.title(f'Magnitude of Gyroscope (Zoomed In: {start_time}-{end_time} sec)')
+        plt.xlabel('Time (seconds)')
+        plt.ylabel('Magnitude')
+        plt.grid()
+
+        plt.tight_layout()
+        plt.show()
+
+        # Plot the magnitude of accelerometer data
+        plt.subplot(2, 1, 1)
+        plt.plot(self.fe.mag_acc, label='Magnitude of Accelerometer (Acc)', color='b')
+        plt.title('Magnitude of Accelerometer (Acc) with Walking and Turning Phases')
+        plt.xlabel('Time (samples)')
+        plt.ylabel('Magnitude')
+        plt.legend()
+
+        # Plot the magnitude of gyroscope data
+        plt.subplot(2, 1, 2)
+        plt.plot(self.fe.mag_gyr, label='Magnitude of Gyroscope (Gyro)', color='r')
+        plt.title('Magnitude of Gyroscope (Gyro) for All Phases')
+        plt.xlabel('Time (samples)')
+        plt.ylabel('Magnitude')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
 
         # mean acc, max acc
         mean_acc = np.mean(mag_acc)
@@ -50,20 +149,111 @@ class GAIT_features:
         # orientations = self._get_orientation(gyr)
         # acc_global = self._transform_acc(acc, orientations)
         # acc_corrected = self._remove_gravity(acc.T)
-        """t = np.arange(0, len(acc[0,:]), 1)
-        velocity_x = np.power(self._get_velocity(self.acc[0, :]), 2)
-        velocity_y = np.power(self._get_velocity(self.acc[1, :]), 2)
-        velocity_z = np.power(self._get_velocity(self.acc[2, :]), 2)"""
 
-        # velocity = self._compute_velocity(acc_corrected)
         velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
         velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
         velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
         mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
-        avg_vel = np.mean(mag_vel) * 10
-        # avg_vel = np.mean(mag_vel)        # ISRAT
+        #avg_vel = np.mean(mag_vel) * 10
+        #gait_features.append(avg_vel)
+        #gait_feature_list.append(str(test_name) + "_avg_vel")
+
+
+        """t = np.arange(0, len(acc[0,:]), 1)
+        velocity_x = np.power(self._get_velocity(self.acc[0, :]), 2)
+        velocity_y = np.power(self._get_velocity(self.acc[1, :]), 2)
+        velocity_z = np.power(self._get_velocity(self.acc[2, :]), 2)"""
+        """
+        orientations = self.fe.get_orientation(gyr)
+        acc_global = self.fe.transform_acc(acc, orientations)
+        acc_corrected = self.fe.remove_gravity(acc_global)
+        velocity = self.fe.compute_velocity(acc_corrected)
+        avg_velocity = self.fe.get_avg_vel(velocity)
+        gait_features.append(avg_velocity)
+        gait_feature_list.append(str(test_name) + "_avg_velocity")  ## Gait_Speed
+
+        print("Raw Acceleration:", acc[:5])
+        print("Gravity Removed Acceleration:", acc_corrected[:5])
+        print("Velocity:", velocity[:5])
+        print("Average Velocity:", avg_velocity)
+        print("Final Velocity:", velocity[-5:])  # Check for drift
+        print("Mean Velocity:", np.mean(velocity, axis=0))  # Check expected range
+        
+        
+         # Step 1: Apply Kalman filter to get velocity components
+        velocity_x = self.fe.apply_Kalman_Filter(self.fe.acc[0, :])
+        velocity_y = self.fe.apply_Kalman_Filter(self.fe.acc[1, :])
+        velocity_z = self.fe.apply_Kalman_Filter(self.fe.acc[2, :])
+
+        # Step 2: Calculate the magnitude of velocity
+        mag_vel = np.sqrt(velocity_x ** 2 + velocity_y ** 2 + velocity_z ** 2)
+
+        # Step 3: Integrate velocity to find total displacement
+        dt = 1.0 / self.fe.fs  # Time step
+
+        # Calculate total displacement using np.trapz
+        try:
+            total_displacement = np.trapz(mag_vel, dx=dt)
+        except AttributeError:
+            # If np.trapz is not available, use manual integration
+            total_displacement = 0
+            for i in range(1, len(mag_vel)):
+                total_displacement += 0.5 * (mag_vel[i] + mag_vel[i - 1]) * dt
+
+        # Step 4: Calculate total time (assuming consistent time step)
+        total_time = len(mag_vel) * dt
+
+        # Step 5: Calculate average velocity
+        avg_vel = total_displacement / total_time
+
+        # Store the result
         gait_features.append(avg_vel)
-        gait_feature_list.append(str(test_name) + "_avg_vel")     ## Gait_Speed
+        gait_feature_list.append(str(test_name) + "_avg_vel")
+    
+        # Step 1: Compute orientation using gyroscope data
+        orientations = self.fe.get_orientation(self.fe.gyr)  # Get orientations from gyro data
+
+        # Step 2: Transform accelerometer data from local to global coordinates
+        acc_global = self.fe.transform_acc(self.fe.acc, orientations)
+
+        # Step 3: Remove gravity from global acceleration
+        acc_data_no_gravity = self.fe.remove_gravity(acc_global)
+
+        velocity = self.fe.compute_velocity(acc_data_no_gravity)
+        avg_vel, _ = self.fe.get_avg_vel(velocity)
+        gait_features.append(avg_vel)
+        gait_feature_list.append(str(test_name) + "_avg_vel")
+    """
+        # Step 1: Remove gravity
+        #acc_data_no_gravity_x = self.fe.remove_gravity(acc[0, :])
+        #acc_data_no_gravity_y = self.fe.remove_gravity(acc[1, :])
+        #acc_data_no_gravity_z = self.fe.remove_gravity(acc[2, :])
+
+        # Step 2: Apply Kalman filter to estimate velocity (for each axis)
+        #velocity_x = self.fe.apply_Kalman_Filter(acc_data_no_gravity[0, :])  # Apply Kalman filter to x-axis
+        #velocity_y = self.fe.apply_Kalman_Filter(acc_data_no_gravity[1, :])  # Apply Kalman filter to y-axis
+        #velocity_z = self.fe.apply_Kalman_Filter(acc_data_no_gravity[2, :])  # Apply Kalman filter to z-axis
+
+        # Step 3: Compute the magnitude of the velocity
+        #mag_vel = np.sqrt(np.power(velocity_x, 2) + np.power(velocity_y, 2) + np.power(velocity_z, 2))
+
+        #velocity_x = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[0, :]), 2)
+        #velocity_y = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[1, :]), 2)
+        #velocity_z = np.power(self.fe.apply_Kalman_Filter(self.fe.acc[2, :]), 2)
+        #mag_vel = np.sqrt(velocity_x + velocity_y + velocity_z)
+
+        # Step 4: Compute the average velocity
+        #avg_vel = np.mean(mag_vel) * 10
+        #avg_vel = np.mean(mag_vel)        # ISRAT
+        #gait_features.append(avg_vel)
+        #gait_feature_list.append(str(test_name) + "_avg_vel")  ## Gait_Speed
+
+        # Plot velocity magnitude
+        plt.plot(mag_vel)
+        plt.title('Velocity Magnitude')
+        plt.xlabel('Time Step')
+        plt.ylabel('Velocity (m/s)')
+        plt.show()
 
         """plt.plot(velocity_x)
         plt.plot(velocity_y)
@@ -91,7 +281,8 @@ class GAIT_features:
                 end = min(len(mag_vel), end)
                 if start < end:
                     cycle_vel = mag_vel[start:end]
-                    velocities_per_cycle.append(np.mean(cycle_vel) * 10)
+                    # velocities_per_cycle.append(np.mean(cycle_vel) * 10)
+                    velocities_per_cycle.append(np.mean(cycle_vel))
 
             # Print velocities per cycle
             print("Velocities per cycle:", velocities_per_cycle)
@@ -130,10 +321,6 @@ class GAIT_features:
 
             outliers = [v for v in velocities_per_cycle if v < lower_bound or v > upper_bound]
             print("Outliers in velocity data:", outliers)
-
-        # Append fatigue percent change feature
-        gait_features.append(fatigue_percent_change)
-        gait_feature_list.append(f"{test_name}_fatigue_percent_change")
 
         # Plot velocity trend
         if velocities_per_cycle:
@@ -238,6 +425,7 @@ class GAIT_features:
         gait_features.append(ds_per)
         gait_feature_list.append(str(test_name) + "_ds_per")
 
+        """
         # **Gait Speed Calculation**     ISRAT
         total_time = duration
         #total_distance = n_steps * np.mean(step_lengths)  # Total distance walked    # Ensure step_lengths is a single value
@@ -246,6 +434,29 @@ class GAIT_features:
 
         gait_features.append(gait_speed)
         gait_feature_list.append(str(test_name) + "_gait_speed")
+        """
+        """
+        walking_distance = 6
+        turning_distance = 1
+        # Distance covered per 2 steps (gait cycle)
+        distance_per_step = (walking_distance + turning_distance)/2  # in meters = 3.5
+
+        # Total distance covered (in meters)
+        #total_dist = n_steps * distance_per_step
+
+        # Total distance covered (in meters)
+        total_dist = n_steps * step_lengths
+
+        # Time duration of the walk (in seconds)
+        time_duration = 2 * 60  # 2 minutes in seconds
+
+        # Gait speed (in meters per second)
+        gait_speed_test = total_dist / time_duration
+
+        # Append the gait speed to the features list
+        gait_features.append(gait_speed_test)
+        gait_feature_list.append(str(test_name) + "_gait_speed_test")
+        """
 
         #gait_features.append(total_distance)
         #gait_feature_list.append(str(test_name) + "_total_distance")

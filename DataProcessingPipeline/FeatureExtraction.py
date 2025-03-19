@@ -13,11 +13,7 @@ from scipy.spatial.transform import Rotation as R
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from scipy.signal import find_peaks
-
-from DataProcessingPipeline.FLEXIBILITY_features import FLEXIBILITY_features
-from DataProcessingPipeline.GAIT_features import GAIT_features
-from DataProcessingPipeline.STS_features import STS_features
-from DataProcessingPipeline.TUG_features import TUG_features
+from filterpy.kalman import KalmanFilter
 
 
 class FeatureExtraction:
@@ -30,13 +26,116 @@ class FeatureExtraction:
         self.acc = acc
         self.mag_acc = np.sqrt(
             np.sum([np.power(acc[0, :], 2), np.power(acc[1, :], 2), np.power(acc[2, :], 2)], axis=0))
+        #print("mag_acc\n", self.mag_acc)
         self.gyr = gyr
         self.mag_gyr = np.sqrt(
             np.sum([np.power(gyr[0, :], 2), np.power(gyr[1, :], 2), np.power(gyr[2, :], 2)], axis=0))
+        #print("mag_gyr\n", self.mag_gyr)
         self.events = events
         self.fs = fs
         self.unproc_acc = unproc_acc
         # self.cog = cog
+
+    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=0.2, gyro_thresh=0.7):
+        walking_times = []
+        turning_times = []
+
+        is_turning = False
+        turn_start = None
+        walk_start = None
+
+        for i in range(len(accel_mag)):
+            if accel_mag[i] < accel_thresh and gyro_mag[i] > gyro_thresh:  # Turning phase
+                if not is_turning:  # If we are switching to a turn
+                    is_turning = True
+                    if walk_start is not None:  # If a walking phase just ended
+                        walking_times.append(i - walk_start)
+                    turn_start = i
+            else:  # Walking phase
+                if is_turning:  # If we were turning and now switching back to walking
+                    is_turning = False
+                    turning_times.append(i - turn_start)
+                    walk_start = i  # Start a new walking phase
+
+        # Edge case: If the last phase was walking or turning, add it
+        if is_turning and turn_start is not None:
+            turning_times.append(len(accel_mag) - turn_start)
+        elif not is_turning and walk_start is not None:
+            walking_times.append(len(accel_mag) - walk_start)
+
+        print("Walking times:", walking_times)
+        print("Turning times:", turning_times)
+
+        sampling_rate = self.fs
+
+        walking_times = [t / sampling_rate for t in walking_times]
+        turning_times = [t / sampling_rate for t in turning_times]
+
+        print("Walking Times (seconds):", walking_times)
+        print("Turning Times (seconds):", turning_times)
+
+        return walking_times, turning_times
+
+    def estimate_total_distance_v2(self, total_time, t_straight, t_turn):
+        # Calculate the duration of one full cycle (T_straight + T_turn)
+        cycle_duration = t_straight + t_turn
+
+        # Calculate the total number of full cycles completed during the total time
+        num_cycles = total_time / cycle_duration
+
+        # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
+        cycle_distance = 6 + 1.04 + 6 + 1.04  # 14.08 meters
+
+        # Calculate the total distance walked
+        total_distance = num_cycles * cycle_distance
+
+        return total_distance
+
+    """
+    # Function to detect turns and straight walking based on threshold
+    def detect_turns(self, accel_mag, gyro_mag, accel_thresh = 0.2, gyro_thresh = 0.65):
+        # Create lists to store times for walking and turning
+        walking_times = []
+        turning_times = []
+
+        is_turning = False
+        turn_start = 0
+        walk_start = 0
+
+        for i in range(len(accel_mag)):
+            if accel_mag[i] < accel_thresh and gyro_mag[i] > gyro_thresh:  # Turn detected
+                if not is_turning:     ## If is_turning == False
+                    is_turning = True
+                    turn_start = i
+                if i == len(accel_mag) - 1:  # End of data
+                    turning_times.append(i - turn_start)
+            else:  # Walking detected
+                if is_turning:
+                    is_turning = False
+                    turning_times.append(i - turn_start)
+                if walk_start == 0 or i - walk_start > 1:  # Ensure walking phase is separated
+                    walk_start = i
+                    walking_times.append(i - walk_start)
+        print("Walking_Time: ", walking_times)
+        print("Turning_Time: ", turning_times)
+        return walking_times, turning_times
+
+    # Function to calculate total distance walked based on straight walking and turning times
+    def estimate_total_distance_v2(self, total_time, t_straight, t_turn):
+        # Calculate the duration of one full cycle (T_straight + T_turn)
+        cycle_duration = t_straight + t_turn
+
+        # Calculate the total number of full cycles completed during the total time
+        num_cycles = total_time / cycle_duration
+
+        # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
+        cycle_distance = 6 + 1.04 + 6 + 1.04  # 14.08 meters
+
+        # Calculate the total distance walked
+        total_distance = num_cycles * cycle_distance
+
+        return total_distance
+    """
 
     # Calculates how much x values deviate from the average
     def _get_deviation(self, x):
@@ -245,6 +344,30 @@ class FeatureExtraction:
     def calculate_jerk(self, start_idx, end_idx):
         return self._calculate_jerk(start_idx, end_idx)
 
+    def moving_average(self, data, window_size=5):
+        return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+
+    def _kalman_filter(self, data):
+        kf = KalmanFilter(dim_x=1, dim_z=1)
+        kf.x = np.array([data[0]])  # Initial state
+        kf.P = np.eye(1) * 1000  # Large initial uncertainty
+        kf.F = np.array([[1]])  # Transition matrix
+        kf.H = np.array([[1]])  # Measurement matrix
+        kf.R = 0.1  # Measurement noise
+        kf.Q = 1e-5  # Process noise
+
+        smoothed_data = []
+        for i in range(len(data)):
+            kf.predict()
+            kf.update(data[i])
+            smoothed_data.append(kf.x[0])
+
+        return smoothed_data                             ## ISRAT
+
+    # public wrapper method
+    def kalman_filter(self, data):
+        return self._kalman_filter(data)
+
     # Uses Kalman Filter to smooth velocity estimates from acceleration data.
     def _apply_Kalman_Filter(self, acc_data):
         # Define Kalman filter parameters
@@ -256,6 +379,7 @@ class FeatureExtraction:
         Q = Q_discrete_white_noise(dim=2, dt=dt, var=0.1)  # Process noise covariance
         R = 1  # Measurement noise covariance
         num_samples = len(acc_data)
+
         # Kalman Filter loop over acceleration measurements
         velocity_estimates = []
 
@@ -284,7 +408,53 @@ class FeatureExtraction:
     def apply_Kalman_Filter(self, acc_data):
         return self._apply_Kalman_Filter(acc_data)
 
+    def Kalman_Filter(self, acc_data):
+        """
+        Uses a Kalman Filter to estimate velocity from acceleration data.
+        """
+
+        dt = 1.0 / self.fs  # Time step
+        kf = KalmanFilter(dim_x=1, dim_z=1)  # 1D Kalman Filter (Velocity estimation)
+
+        # State transition matrix (Velocity update: v_new = v_old + a*dt)
+        kf.F = np.array([[1]])  # Velocity remains unless changed by acceleration
+
+        # Measurement function (Direct acceleration measurement)
+        kf.H = np.array([[1]])  # We observe acceleration directly
+
+        # Process noise (assumed small uncertainty in acceleration)
+        kf.Q = np.array([[0.01]])  # Process noise covariance (tune if needed)
+
+        # Measurement noise (sensor noise in acceleration)
+        kf.R = np.array([[1]])  # Measurement noise covariance
+
+        # Initial state estimate (starting velocity)
+        kf.x = np.array([[0]])  # Initial velocity assumed 0
+
+        # Initial covariance matrix
+        kf.P = np.array([[1]])
+
+        velocity_estimates = []
+        velocity = 0  # Start with zero velocity
+
+        for acc in acc_data:
+            # Predict step (velocity update with acceleration integration)
+            velocity += acc * dt  # Integrating acceleration to get velocity
+
+            # Kalman filter update
+            kf.predict()
+            kf.update(np.array([[velocity]]))  # Feeding estimated velocity
+
+            # Store the velocity estimate
+            velocity_estimates.append(kf.x[0, 0])
+
+        return np.array(velocity_estimates)
+
     def run(self, test, task):
+        from DataProcessingPipeline.FLEXIBILITY_features import FLEXIBILITY_features
+        from DataProcessingPipeline.GAIT_features import GAIT_features
+        from DataProcessingPipeline.STS_features import STS_features
+        from DataProcessingPipeline.TUG_features import TUG_features
         print(f"Extracting features...\n")
         feat = []
         feat_list = []

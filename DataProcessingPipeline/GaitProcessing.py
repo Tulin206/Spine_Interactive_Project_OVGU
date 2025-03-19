@@ -431,7 +431,7 @@ class GaitProcessing:
         self.plot(mag_enode, mag_acc, gyr, acc)
         if test == "gait":
             events, valid = self.get_gaitEvents(acc, gyr)
-            print("\nevents", events[180:290])
+            print("\nevents", events[180:390])
             print("\nvalid", valid)
         elif test == "sts":
             events, valid = self.get_STSEvents(gyr)
