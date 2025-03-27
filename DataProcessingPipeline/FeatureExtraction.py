@@ -36,6 +36,7 @@ class FeatureExtraction:
         self.unproc_acc = unproc_acc
         # self.cog = cog
 
+<<<<<<< HEAD
     def calculate_mad(self, data):
         """Calculate Median Absolute Deviation (MAD)"""
         median = np.median(data)
@@ -107,6 +108,9 @@ class FeatureExtraction:
         if accel_thresh is None or gyro_thresh is None:
             accel_thresh, gyro_thresh = self.calculate_adaptive_thresholds(accel_mag, gyro_mag)
 
+=======
+    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=0.53, gyro_thresh=0.79):
+>>>>>>> e3cc860018b71efc0bcfccc6b34dc06905a8f9b9
         walking_times = []
         turning_times = []
 
@@ -154,12 +158,18 @@ class FeatureExtraction:
         # Calculate the total number of full cycles completed during the total time
         num_cycles = total_time / cycle_duration
 
+<<<<<<< HEAD
         # Total distance per cycle (10m forward, 1.04m turn, 10m backward, 1.04m turn)
         cycle_distance = 10 + 1.04 + 10 + 1.04  # 22.08 meters
+=======
+        # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
+        cycle_distance = 10 + 1.04 + 10 + 1.04  # 14.08 meters
+>>>>>>> e3cc860018b71efc0bcfccc6b34dc06905a8f9b9
 
         # Calculate the total distance walked
         total_distance = num_cycles * cycle_distance
 
+<<<<<<< HEAD
         return total_distance
 
     import matplotlib.pyplot as plt
@@ -225,9 +235,19 @@ class FeatureExtraction:
 
         # Calculate the total distance walked
         total_distance = num_cycles * cycle_distance
+=======
+        # Account for incomplete cycle if the last one is unfinished
+        remaining_time = total_time % cycle_duration
+        if remaining_time > 0:
+            # Check if the remaining time includes a turning phase or not
+            if remaining_time > t_straight:
+                # Add the remaining distance from the last incomplete cycle
+                total_distance += (remaining_time - t_straight) / t_turn * 1.04  # Proportional distance based on remaining turn time
+            else:
+                total_distance += (remaining_time / t_straight) * 10  # Add the remaining walking distance
+>>>>>>> e3cc860018b71efc0bcfccc6b34dc06905a8f9b9
 
         return total_distance
-    """
 
     # Calculates how much x values deviate from the average
     def _get_deviation(self, x):
