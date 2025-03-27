@@ -51,6 +51,8 @@ class STS_features:
         print(f"\nMean duration of repetitions: {mean_t_rep:.2f} seconds")
         sts_features.append(mean_t_rep)
         sts_feature_list.append(str(test_name) + "_avg_time_rep")
+
+        # --- Initialize Lists for Repetition-Based Features ---
         peak_acc_rep = []
         peak_gyr_rep = []
 
@@ -70,13 +72,19 @@ class STS_features:
         sitts_gyr_rep = []
         standts_gyr_rep = []
 
+        # NEW: Torso Mobility ROM
+        lateral_rom_rep = []  # Lateral inclination ROM (X-axis)
+        flexion_extension_rom_rep = []  # Flexion/extension ROM (Y-axis)
+
         for r in range(rep):
+            # Peak magnitude features
             peak_acc_rep.append(np.max(self.fe.mag_acc[sit2stand[r]:stand2sit[r]]))
             peak_gyr_rep.append(np.max(self.fe.mag_gyr[sit2stand[r]:stand2sit[r]]))
 
             # Compute mean acceleration for this repetition         # ISRAT
             mean_sitts_acc_rep = np.mean(self.fe.mag_acc[sit2stand[r]:stand2sit[r]])
             sitts_acc_rep.append(mean_sitts_acc_rep)
+
             # Ensure valid range for the next repetition (r + 1 should not exceed rep - 1)
             if r < rep - 1:
                 mean_standts_acc_rep = np.nanmean(self.fe.mag_acc[stand2sit[r + 1]:sit2stand[r + 1]])  # Handle NaN values
@@ -127,6 +135,24 @@ class STS_features:
             rom_acc_rep.append(rom_acc)
             rom_gyr_rep.append(rom_gyr)
 
+            # --- NEW: TORSO MOBILITY ROM ---
+            # Extract raw acceleration (X=mediolateral, Y=anteroposterior)
+            acc_x = self.fe.acc[0, sit2stand[r]:stand2sit[r]]  # Lateral (left-right)
+            acc_y = self.fe.acc[1, sit2stand[r]:stand2sit[r]]  # Flexion/extension (forward-backward)
+
+            # Calculate ROM for torso movements
+            lateral_rom = np.max(acc_x) - np.min(acc_x)
+            flexion_rom = np.max(acc_y) - np.min(acc_y)
+            lateral_rom_rep.append(lateral_rom)
+            flexion_extension_rom_rep.append(flexion_rom)
+
+            ### === DEBUGGING OUTPUT === ###
+            print(f"\nRep {r + 1} Torso Mobility:")
+            print(f"  Lateral ROM (X-axis): {lateral_rom:.3f} g")
+            print(f"  Flexion/Extension ROM (Y-axis): {flexion_rom:.3f} g")
+            print(f"  Time: {t_rep[r]:.2f} sec")
+            ### === END DEBUGGING === ###
+
         # Convert the peak lists to numpy arrays
         peak_acc_rep = np.array(peak_acc_rep)
         peak_gyr_rep = np.array(peak_gyr_rep)
@@ -172,6 +198,16 @@ class STS_features:
         sts_feature_list.append(str(test_name) + "_rom_acc")
         sts_features.append(rom_gyr_rep)
         sts_feature_list.append(str(test_name) + "_rom_gyr")
+
+        lateral_rom_rep = np.array(lateral_rom_rep)  # NEW
+        flexion_extension_rom_rep = np.array(flexion_extension_rom_rep)  # NEW
+
+        # NEW: Torso mobility features (mean ROM across reps)
+        sts_features.extend([np.mean(lateral_rom_rep), np.mean(flexion_extension_rom_rep)])
+        sts_feature_list.extend([
+            f"{test_name}_mean_lateral_rom",
+            f"{test_name}_mean_flex_ext_rom"
+        ])
 
         # Variability in repetitions [Rep-to-rep deviation (time)]
         # Calculate the standard deviation and coefficient of variation for time, acceleration, and gyroscope

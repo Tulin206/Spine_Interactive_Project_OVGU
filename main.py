@@ -7,7 +7,7 @@ import pandas as pd
 from tabulate import tabulate
 import os, sys
 #sys.path.append('/project/yuece/SourceLoc/bin/python/')
-sys.path.append('/home/isratjahantulin/Downloads/SPINE_Code')
+sys.path.append('/home/isratjahantulin/Downloads/SPINE_Code')       ## ISRAT's Location
 
 if __name__ == '__main__':
     #enode_data_dir = "/data/project/spine/enode_data/"

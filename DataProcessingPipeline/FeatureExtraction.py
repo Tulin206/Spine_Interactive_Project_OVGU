@@ -36,7 +36,77 @@ class FeatureExtraction:
         self.unproc_acc = unproc_acc
         # self.cog = cog
 
-    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=0.2, gyro_thresh=0.7):
+    def calculate_mad(self, data):
+        """Calculate Median Absolute Deviation (MAD)"""
+        median = np.median(data)
+        deviations = np.abs(data - median)
+        mad = np.median(deviations)
+        return mad
+
+    def adaptive_threshold_mad(self, data, threshold_factor=5.3):
+        """Calculate an adaptive threshold using MAD method"""
+        mad = self.calculate_mad(data)
+        median = np.median(data)
+        threshold = median + threshold_factor * mad
+        return threshold
+
+    def calculate_adaptive_thresholds(self, accel_mag, gyro_mag):
+        """Calculate separate adaptive thresholds for acceleration and gyroscope"""
+        accel_thresh = self.adaptive_threshold_mad(accel_mag)
+        gyro_thresh = self.adaptive_threshold_mad(gyro_mag)
+        return accel_thresh, gyro_thresh
+
+    # def calculate_mad(self, data):
+    #     """Calculate Median Absolute Deviation (MAD)"""
+    #     median = np.median(data)
+    #     deviations = np.abs(data - median)
+    #     mad = np.median(deviations)
+    #     return mad
+    #
+    # def calculate_std(self, data):
+    #     """Calculate Standard Deviation (STD)"""
+    #     return np.std(data)
+    #
+    # def adaptive_threshold_mad(self, data, threshold_factor=3.0, use_std=False, window_size=50):
+    #     """Calculate an adaptive threshold using MAD or Standard Deviation"""
+    #     if use_std:
+    #         # Use Standard Deviation based dynamic thresholding
+    #         mean = np.mean(data)
+    #         std_dev = self.calculate_std(data)
+    #         threshold = mean + threshold_factor * std_dev
+    #     else:
+    #         # Use MAD for thresholding
+    #         mad = self.calculate_mad(data)
+    #         median = np.median(data)
+    #         threshold = median + threshold_factor * mad
+    #
+    #     return threshold
+    #
+    # def adaptive_threshold_moving_avg(self, data, window_size=50, threshold_factor=3.0, use_std=False):
+    #     """Calculate a dynamic threshold based on the moving average and MAD or STD"""
+    #     if len(data) < window_size:
+    #         window_size = len(data)
+    #
+    #     # Compute moving averages and thresholds over sliding windows
+    #     thresholds = []
+    #     for i in range(window_size, len(data)):
+    #         window_data = data[i - window_size:i]
+    #         threshold = self.adaptive_threshold_mad(window_data, threshold_factor, use_std)
+    #         thresholds.append(threshold)
+    #
+    #     return thresholds
+    #
+    # def calculate_adaptive_thresholds(self, accel_mag, gyro_mag, use_std=False, window_size=50):
+    #     """Calculate adaptive thresholds for acceleration and gyroscope using moving average method"""
+    #     accel_thresh = self.adaptive_threshold_moving_avg(accel_mag, window_size, use_std=use_std)
+    #     gyro_thresh = self.adaptive_threshold_moving_avg(gyro_mag, window_size, use_std=use_std)
+    #     return accel_thresh, gyro_thresh
+
+    def detect_turns(self, accel_mag, gyro_mag, accel_thresh=None, gyro_thresh=None):
+        # Calculate thresholds automatically if not provided
+        if accel_thresh is None or gyro_thresh is None:
+            accel_thresh, gyro_thresh = self.calculate_adaptive_thresholds(accel_mag, gyro_mag)
+
         walking_times = []
         turning_times = []
 
@@ -63,9 +133,10 @@ class FeatureExtraction:
         elif not is_turning and walk_start is not None:
             walking_times.append(len(accel_mag) - walk_start)
 
-        print("Walking times:", walking_times)
-        print("Turning times:", turning_times)
+        print("Walking times (samples):", walking_times)
+        print("Turning times (samples):", turning_times)
 
+        # Convert to seconds
         sampling_rate = self.fs
 
         walking_times = [t / sampling_rate for t in walking_times]
@@ -83,13 +154,34 @@ class FeatureExtraction:
         # Calculate the total number of full cycles completed during the total time
         num_cycles = total_time / cycle_duration
 
-        # Total distance per cycle (6m forward, 1.04m turn, 6m backward, 1.04m turn)
-        cycle_distance = 6 + 1.04 + 6 + 1.04  # 14.08 meters
+        # Total distance per cycle (10m forward, 1.04m turn, 10m backward, 1.04m turn)
+        cycle_distance = 10 + 1.04 + 10 + 1.04  # 22.08 meters
 
         # Calculate the total distance walked
         total_distance = num_cycles * cycle_distance
 
         return total_distance
+
+    import matplotlib.pyplot as plt
+
+    def plot_phases(self, accel_mag, gyro_mag, walking_times_samples, turning_times_samples):
+        plt.figure(figsize=(12, 6))
+
+        # Plot raw data
+        plt.plot(accel_mag, label='Accel Mag')
+        plt.plot(gyro_mag, label='Gyro Mag')
+
+        # Mark detected phases
+        walk_mask = np.zeros_like(accel_mag)
+        turn_mask = np.zeros_like(accel_mag)
+
+        # Reconstruct phase timeline
+        # (You'll need to implement this based on your walking_times/turning_times arrays)
+
+        plt.plot(walk_mask, 'g', alpha=0.3, label='Walking')
+        plt.plot(turn_mask, 'r', alpha=0.3, label='Turning')
+        plt.legend()
+        plt.show()
 
     """
     # Function to detect turns and straight walking based on threshold

@@ -102,23 +102,24 @@ class DataExtraction:
         X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='t11' + '_2mW', rep=None, ext='.xls')
         X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='t11' + '_2mW' + '_labelled',
                                              rep=None, ext='.tsv')
-        """
-        ## ISRAT
-        X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_STS5r_1', rep=None, ext='.xls')
-        X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_STS5r_1' + '_labelled',
-                                             rep=None, ext='.tsv')
 
-        ## ISRAT
-        X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_TUGst_1', rep=None, ext='.xls')
-        X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_TUGst_1' + '_labelled_modified',
-                                             rep=None, ext='.tsv')
+        # X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s6' + '_2mW_1', rep=None, ext='.xls')
+        # X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s6' + '_2mW_1' + '_labelled',
+        #                                      rep=None, ext='.tsv')
 
-        ## ISRAT
-        X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_2mW_1', rep=None, ext='.xls')
-        X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_2mW_1' + '_labelled',
-                                             rep=None, ext='.tsv')
-        """
-
+        # ## ISRAT
+        # X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_STS5r_1', rep=None, ext='.xls')
+        # X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_STS5r_1' + '_labelled',
+        #                                      rep=None, ext='.tsv')
+        # ## ISRAT
+        # X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_TUGst_1', rep=None, ext='.xls')
+        # X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_TUGst_1' + '_labelled_modified',
+        #                                      rep=None, ext='.tsv')
+        #
+        # ## ISRAT
+        # X_acc_s, X_gyr_s = self.read2minData(dir=self.sp_data_dir, fname='s4' + '_2mW_1', rep=None, ext='.xls')
+        # X_acc_e, X_gyr_e = self.read2minData(dir=self.enode_data_dir, fname='s4' + '_2mW_1' + '_labelled',
+        #                                      rep=None, ext='.tsv')
 
         delay = 0
         srate_enode = 62.5
